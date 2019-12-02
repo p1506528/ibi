@@ -5,6 +5,7 @@ import pickle # pour désérialiser les données
 import numpy # pour pouvoir utiliser des matrices
 import matplotlib.pyplot as plt # pour l'affichage
 import torch,torch.utils.data
+import random
 
 
 # fonction qui va afficher l'image située à l'index index
@@ -23,7 +24,6 @@ def affichage(image,label):
     plt.show()
 
   
-# c'est ce qui sera lancé lors que l'on fait python lecture_data_3.py
 if __name__ == '__main__':
     # nombre d'image lues à chaque fois dans la base d'apprentissage (laisser à 1 sauf pour la question optionnelle sur les minibatchs)
     TRAIN_BATCH_SIZE = 1
@@ -37,51 +37,45 @@ if __name__ == '__main__':
     test_data = torch.Tensor(data[1][0])
     # labels de la base de test
     test_data_label = torch.Tensor(data[1][1])
-    # on crée la base de données d'apprentissage (pour torch)
     train_dataset = torch.utils.data.TensorDataset(train_data,train_data_label)
-    # on crée la base de données de test (pour torch)
     test_dataset = torch.utils.data.TensorDataset(test_data,test_data_label)
-    # on crée le lecteur de la base de données d'apprentissage (pour torch)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAIN_BATCH_SIZE, shuffle=True)
-    # on crée le lecteur de la base de données de test (pour torch)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
-    # 10 fois
-    """
-    for i in range(0,10):
-        # on demande les prochaines données de la base
-        (_,(image,label)) = enumerate(train_loader).__next__()
-        # on les affiche
-        affichage(image[0,:].numpy(),label[0,:].numpy())
-        """
-    # NB pour lire (plus proprement) toute la base (ce que vous devrez faire dans le TP) plutôt utiliser la formulation suivante
-#    for image,label in train_loader:
-#        affichage(image[0,:].numpy(),label[0,:].numpy())
-
-    #On initialise les poids aléatoirement
     poids = numpy.random.rand(785,10)
     taux = 0.01
+    pas = 20000
     
-    #print(poids)
-
-    #On prend les images une par une dans la base d'apprentissage
+    print('loaded')
+    
+    train = []
     for image, label in train_loader:
+        image = image[0,:].numpy()
+        image = numpy.append(image, 1)
+        label = label[0,:].numpy()
+        train.append((image, label))
+
+    print('training')
+    
+    for i in range(pas):
+        print(i)
+        record = random.choice(train)
+        img = record[0]
+        label = record[1].reshape((1,10))
+        activite = img.dot(poids)
+        diff = label - activite
+        img = img.reshape((785,1))
+        rectif = taux * img * diff
+        poids += rectif
+    
+    print('test')
+    
+    n = 0
+    g = 0
+    for image, label in test_loader:
+        n += 1
         img = image[0,:].numpy()
         img = numpy.append(img, 1)
         activite = img.dot(poids)
-        print(activite)
-        diff = label[0,:].numpy() - activite
-        diff = diff.reshape((1,10))
-        img = img.reshape((785,1))
-        rectif = taux * img * diff
-        #print(rectif.shape)
-        #print("coucou")
-        poids -= rectif
-    
-    #print(poids)
-    
-    (_,(image,label)) = enumerate(test_loader).__next__()
-    img = image[0,:].numpy()
-    img = numpy.append(img, 1)
-    activite = img.dot(poids)
-    print(activite)
-    print(label[0,:].numpy())
+        if(numpy.argmax(activite) == numpy.argmax(label[0,:].numpy())):
+            g = g + 1
+    print(g/n)

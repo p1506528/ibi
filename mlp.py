@@ -25,7 +25,8 @@ if __name__ == '__main__':
     test_dataset = torch.utils.data.TensorDataset(test_data,test_data_label)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAIN_BATCH_SIZE, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
-    poids = numpy.random.rand(785,10)
+    poids_cache = numpy.random.rand(785,10)
+    poids_sortie = numpy.random.rand(10,10)
     taux = 0.001
     pas = 500000
     
@@ -45,7 +46,18 @@ if __name__ == '__main__':
         record = random.choice(train)
         img = record[0]
         label = record[1].reshape((1,10))
-        activite = img.dot(poids)
+        exp = -img.dot(poids_cache)
+        activite_cache = 1 / (1 + numpy.exp(exp))
+        print(activite_cache.shape)
+        activite_sortie = poids_sortie.dot(activite_cache)
+        print(activite_sortie.shape)
+        print(label.shape)
+        erreur_sortie = label - activite_sortie
+        print(erreur_sortie.shape)
+        erreur_cache = activite_cache * (1 - activite_cache) * erreur_sortie.dot(poids_sortie)
+        print(erreur_cache.shape)
+        diff_cache = taux * erreur_sortie * activite_sortie
+        print(diff_cache.shape) 
         diff = label - activite
         img = img.reshape((785,1))
         rectif = taux * img * diff

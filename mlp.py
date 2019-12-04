@@ -43,25 +43,21 @@ if __name__ == '__main__':
     
     for i in range(pas):
         print(i)
-        record = random.choice(train)
+        if i < len(train):
+            record = train[i]
+        else:
+            record = random.choice(train)
         img = record[0]
         label = record[1].reshape((1,10))
         exp = -img.dot(poids_cache)
         activite_cache = 1 / (1 + numpy.exp(exp))
-        print(activite_cache.shape)
         activite_sortie = poids_sortie.dot(activite_cache)
-        print(activite_sortie.shape)
-        print(label.shape)
         erreur_sortie = label - activite_sortie
-        print(erreur_sortie.shape)
         erreur_cache = activite_cache * (1 - activite_cache) * erreur_sortie.dot(poids_sortie)
-        print(erreur_cache.shape)
-        diff_cache = taux * erreur_sortie * activite_sortie
-        print(diff_cache.shape) 
-        diff = label - activite
-        img = img.reshape((785,1))
-        rectif = taux * img * diff
-        poids += rectif
+        diff_sortie = taux * activite_cache.reshape((10,1)).dot(erreur_sortie)
+        diff_cache = taux * img.reshape((785,1)).dot(erreur_cache)
+        poids_sortie += diff_sortie
+        poids_cache += diff_cache
     
     print('test')
     
@@ -71,7 +67,9 @@ if __name__ == '__main__':
         n += 1
         img = image[0,:].numpy()
         img = numpy.append(img, 1)
-        activite = img.dot(poids)
-        if(numpy.argmax(activite) == numpy.argmax(label[0,:].numpy())):
+        exp = -img.dot(poids_cache)
+        activite_cache = 1 / (1 + numpy.exp(exp))
+        activite_sortie = poids_sortie.dot(activite_cache)
+        if(numpy.argmax(activite_sortie) == numpy.argmax(label[0,:].numpy())):
             g = g + 1
     print(g/n)

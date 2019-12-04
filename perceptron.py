@@ -42,7 +42,10 @@ if __name__ == '__main__':
     
     for i in range(pas):
         print(i)
-        record = random.choice(train)
+        if i < len(train):
+            record = train[i]
+        else:
+            record = random.choice(train)
         img = record[0]
         label = record[1].reshape((1,10))
         activite = img.dot(poids)

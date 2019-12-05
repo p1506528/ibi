@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt # pour l'affichage
 import torch,torch.utils.data
 import random
 import math
+import statistics
 
   
 if __name__ == '__main__':
@@ -26,10 +27,10 @@ if __name__ == '__main__':
     test_dataset = torch.utils.data.TensorDataset(test_data,test_data_label)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAIN_BATCH_SIZE, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
-    poids_cache = numpy.random.rand(785,10)
-    poids_sortie = numpy.random.rand(10,10)
+    poids_cache = numpy.random.rand(785,100)
+    poids_sortie = numpy.random.rand(100,10)
     taux = 0.1
-    pas = 10000
+    pas = 100
     
     print('loaded')
     
@@ -52,14 +53,20 @@ if __name__ == '__main__':
         label = record[1].reshape((1,10))
         '''
         exp = -img.dot(poids_cache)
+        print(exp.shape)
         activite_cache = 1 / (1 + numpy.exp(exp))
-        activite_sortie = poids_sortie.dot(activite_cache)
+        activite_sortie = activite_cache.reshape((1,100)).dot(poids_sortie)
         erreur_sortie = label - activite_sortie
-        erreur_cache = activite_cache * (1 - activite_cache) * erreur_sortie.dot(poids_sortie)
+        erreur_cache = activite_cache * (1 - activite_cache)
+        erreur_cache_2 = poids_sortie.dot(erreur_sortie.reshape((10,1)))
+        print(erreur_cache.shape)
+        print(erreur_cache_2.shape)
+        erreur_cache *= erreur_cache_2
         diff_sortie = taux * activite_cache.reshape((10,1)).dot(erreur_sortie)
         diff_cache = taux * img.reshape((785,1)).dot(erreur_cache)
         poids_sortie += diff_sortie
         poids_cache += diff_cache
+        break
         '''
         activite_cache = []
         for i in range(10):
@@ -67,23 +74,23 @@ if __name__ == '__main__':
         #print(activite_cache)
         activite_sortie = []
         for i in range(10):
-            activite_sortie.append(sum([poids_sortie[j,i] * activite_cache[i] for j in range(10)]))
+            activite_sortie.append(sum([poids_sortie[j,i] * activite_cache[j] for j in range(10)]))
         #print(activite_sortie)
         erreur_sortie = []
         for i in range(10):
             erreur_sortie.append(label[0,i] - activite_sortie[i])
-        #print(erreur_sortie)
+        #print(statistics.mean(erreur_sortie))
         erreur_cache = []
         for i in range(10):
             erreur_cache.append(activite_cache[i] * (1-activite_cache[i]) * sum([poids_sortie[i,j] * erreur_sortie[j] for j in range(10)]))
-        #print(erreur_cache)
+        print(statistics.mean(erreur_cache))
         for i in range(10):
             for j in range(10):
                 poids_sortie[j,i] += taux * erreur_sortie[i] * activite_cache[j]
         for i in range(10):
             for j in range(785):
                 poids_cache[j,i] += taux * erreur_cache[i] * img[j]
-        #break       
+        #break   
     
     print('test')
     
@@ -95,10 +102,11 @@ if __name__ == '__main__':
         img = numpy.append(img, 1)
         activite_cache = []
         for i in range(10):
-            activite_cache.append(1 / (1 + numpy.exp(-sum([poids_cache[j,i]  * img[j] for j in range(785)]))))
+            activite_cache.append(1 / (1 + math.exp(-sum([poids_cache[j,i]  * img[j] for j in range(785)]))))
         activite_sortie = []
         for i in range(10):
-            activite_sortie.append(sum([poids_sortie[j,i] * activite_cache[i] for j in range(10)]))
+            activite_sortie.append(sum([poids_sortie[j,i] * activite_cache[j] for j in range(10)]))
+        #print(numpy.argmax(activite_sortie))
         if(numpy.argmax(activite_sortie) == numpy.argmax(label[0,:].numpy())):
             g = g + 1
     print(g/n)

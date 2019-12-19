@@ -2,7 +2,7 @@
 
 import gzip # pour décompresser les données
 import pickle # pour désérialiser les données
-import numpy # pour pouvoir utiliser des matrices
+import numpy as np# pour pouvoir utiliser des matrices
 import matplotlib.pyplot as plt # pour l'affichage
 import torch,torch.utils.data
 import random
@@ -27,18 +27,27 @@ if __name__ == '__main__':
     test_dataset = torch.utils.data.TensorDataset(test_data,test_data_label)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAIN_BATCH_SIZE, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
-    cache_nb = 2
-    poids_cache = numpy.random.rand(785,cache_nb)
-    poids_sortie = numpy.random.rand(cache_nb,10)
-    taux = 0.001
-    pas = 100
     
     print('loaded')
+    taux = 0.001
+    pas = 100
+    nb_input = 784
+    nb_cache = 128                              
+    nb_output = 10
+    pds_cache = np.zeros((nb_cache, nb_input)) 
+    pds_sortie = np.random.randn(nb_output, nb_cache) 
+    biais_cache = np.zeros((nb_cache))  
+    biais_sortie = np.random.randn(nb_output)   
+
+    def sigmoid(y):
+        return 1. / (1. + np.exp(-y))
+
+    def der_sigmoid(y):
+        return np.multiply(y, (1 - y))
     
     train = []
     for image, label in train_loader:
         image = image[0,:].numpy()
-        image = numpy.append(image, 1)
         label = label[0,:].numpy()
         train.append((image, label))
 
@@ -51,74 +60,29 @@ if __name__ == '__main__':
         else:
             record = random.choice(train)
         img = record[0]
-        label = record[1].reshape((1,10))
+        label = record[1]
         
-        exp = -(img.dot(poids_cache))
-        activite_cache = 1 / (1 + numpy.exp(exp))
-        
-        
-        activite_sortie = activite_cache.dot(poids_sortie)
+        activite_cache = sigmoid(np.dot(pds_cache, img) + biais_cache)
+        activite_sortie = np.dot(pds_sortie, activite_cache) + biais_sortie
         
         erreur_sortie = label - activite_sortie
+        erreur_cache = der_sigmoid(activite_cache) * np.dot(erreur_sortie, pds_sortie)
         
-        erreur_cache = activite_cache * (1 - activite_cache)
-        erreur_cache_2 = poids_sortie.dot(erreur_sortie.reshape((10,1)))
-        erreur_cache = erreur_cache.reshape((cache_nb, 1)) * erreur_cache_2
-        
-        diff_sortie = taux * activite_cache.reshape((cache_nb,1)).dot(erreur_sortie)
-        
-        img.reshape((785,1))
-        diff_cache = taux * img * erreur_cache
-        
-        poids_sortie += diff_sortie
-        poids_cache += diff_cache.reshape((785,cache_nb))
-        print(activite_sortie)
-        #break
-        '''
-        activite_cache = []
-        for i in range(10):
-            activite_cache.append(1 / (1 + math.exp(-sum([poids_cache[j,i]  * img[j] for j in range(785)]))))
-        #print(activite_cache)
-        activite_sortie = []
-        for i in range(10):
-            activite_sortie.append(sum([poids_sortie[j,i] * activite_cache[j] for j in range(10)]))
-        #print(activite_sortie)
-        erreur_sortie = []
-        for i in range(10):
-            erreur_sortie.append(label[0,i] - activite_sortie[i])
-        #print(statistics.mean(erreur_sortie))
-        erreur_cache = []
-        for i in range(10):
-            erreur_cache.append(activite_cache[i] * (1-activite_cache[i]) * sum([poids_sortie[i,j] * erreur_sortie[j] for j in range(10)]))
-        print(statistics.mean(erreur_cache))
-        for i in range(10):
-            for j in range(10):
-                poids_sortie[j,i] += taux * erreur_sortie[i] * activite_cache[j]
-        for i in range(10):
-            for j in range(785):
-                poids_cache[j,i] += taux * erreur_cache[i] * img[j]
-        #break   
-		'''
+        diff_sortie = taux * np.transpose([activite_cache] * nb_output) * erreur_sortie
+        pds_sortie += diff_sortie.T
+        biais_sortie += taux * erreur_sortie
+        diff_cache = taux * np.transpose([img] * nb_cache) * erreur_cache
+        pds_cache += diff_cache.T
+        biais_cache += taux * erreur_cache
+
     print('test')
-    
-    n = 0
-    g = 0
-    for image, label in test_loader:
-        n += 1
-        img = image[0,:].numpy()
-        img = numpy.append(img, 1)
-        """
-        activite_cache = []
-        for i in range(cache_nb):
-            activite_cache.append(1 / (1 + math.exp(-sum([poids_cache[j,i]  * img[j] for j in range(785)]))))
-        activite_sortie = []
-        for i in range(10):
-            activite_sortie.append(sum([poids_sortie[j,i] * activite_cache[j] for j in range(10)]))
-        """
-        exp = -(img.dot(poids_cache))
-        activite_cache = 1 / (1 + numpy.exp(exp))
-        activite_sortie = activite_cache.reshape((1,cache_nb)).dot(poids_sortie)
-        #print(numpy.argmax(activite_sortie))
-        if(numpy.argmax(activite_sortie) == numpy.argmax(label[0,:].numpy())):
-            g = g + 1
-    print(g/n)
+
+    def test():
+        accuracy = 0
+        for img, label in test_loader:
+            y_h = sigmoid(np.dot(pds_cache, img[0,:].numpy()) + biais_cache)    
+            y_o = np.dot(pds_sortie, y_h) + biais_sortie
+            accuracy += np.argmax(y_o) == np.argmax(label[0,:].numpy())
+        return accuracy / len(test_data)
+
+    print(test())
